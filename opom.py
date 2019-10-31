@@ -143,7 +143,8 @@ class OPOM(object):
                     if self.R_i[i,j,k] == 0:
                         F[l,l] = np.exp(self.Ts * self.R_r[i,j,k])
                         Dd_ref[l,l] = Dd_r[i,j,k]
-                        psi[i,k + j*self.nu + i*dim] = 1
+                        #psi[i,k + j*self.nu + i*dim] = 1
+                        psi[i,l] = 1
                         k += 1
                         l += 1
                     else:
@@ -159,8 +160,10 @@ class OPOM(object):
                         Dd_ref[l,l+1] = Dd_r[i,j,k] + Dd_i[i,j,k]
                         Dd_ref[l+1,l] = -Dd_r[i,j,k] - Dd_i[i,j,k]
                         Dd_ref[l+1,l+1] = Dd_r[i,j,k] - Dd_i[i,j,k]
-                        psi[i,k + j*self.nu + i*dim] = 1
-                        psi[i,k+1 + j*self.nu + i*dim] = 0
+                        #psi[i,k + j*self.nu + i*dim] = 1
+                        #psi[i,k+1 + j*self.nu + i*dim] = 0
+                        psi[i,l] = 1
+                        psi[i,l+1] = 0
                         k += 2
                         l += 2
                                             
