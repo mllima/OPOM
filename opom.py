@@ -11,17 +11,20 @@ from scipy import signal
 from scipy.linalg import block_diag
 import math
 
-class TransferFunctionDelay(signal.TransferFunction):
+class TransferFunction(signal.TransferFunction):
     def __init__(self, num, den, delay=0):
-        super().__init__(num, den)
-        self.delay = delay 
+        super().__init__(num,den)
+        self.delay = delay
+        self.tf = signal.TransferFunction(num,den)
 
     def __repr__(self):
-        return "num={}\nden={}\ndt={}\ndelay={}".format(self.num, self.den, self.dt, self.delay)
+        return "tf: {}\ndelay: {}".format(self.tf, self.delay)
 
 
 class OPOM(object):
     def __init__(self, H, Ts):
+        if type(H) != list:
+            H = [H]  
         self.H = np.array(H)
         if self.H.size == 1:
             self.ny = 1
@@ -143,7 +146,6 @@ class OPOM(object):
                     if self.R_i[i,j,k] == 0:
                         F[l,l] = np.exp(self.Ts * self.R_r[i,j,k])
                         Dd_ref[l,l] = Dd_r[i,j,k]
-                        #psi[i,k + j*self.nu + i*dim] = 1
                         psi[i,l] = 1
                         k += 1
                         l += 1
@@ -160,8 +162,6 @@ class OPOM(object):
                         Dd_ref[l,l+1] = Dd_r[i,j,k] + Dd_i[i,j,k]
                         Dd_ref[l+1,l] = -Dd_r[i,j,k] - Dd_i[i,j,k]
                         Dd_ref[l+1,l+1] = Dd_r[i,j,k] - Dd_i[i,j,k]
-                        #psi[i,k + j*self.nu + i*dim] = 1
-                        #psi[i,k+1 + j*self.nu + i*dim] = 0
                         psi[i,l] = 1
                         psi[i,l+1] = 0
                         k += 2
