@@ -23,7 +23,7 @@ class TransferFunction(signal.TransferFunction):
 
 class OPOM(object):
     def __init__(self, H, Ts):
-        if type(H) != list:
+        if type(H) != list or np.shape(H[0]) == ():
             H = [H]  
         self.H = np.array(H)
         if self.H.size == 1:
