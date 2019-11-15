@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Apr 26 12:07:03 2017
-@author: Igor Yamamoto
+@author: Igor Yamamoto and Marcelo Lima
 Changed 07/04/2018 - Marcelo Lima
 Changed 28/10/2019 - Marcelo Lima (deal with complex numbers)
 """
@@ -33,8 +33,8 @@ class OPOM(object):
             self.ny = self.H.shape[0]
             self.nu = self.H.shape[1]
         self.Ts = Ts
-        self.na = self._max_order()  # max order of Gij
-        self.nd = self.ny*self.nu*self.na
+        self.na = self._order()  # order of Gij
+        self.nd = self.na.sum()
         self.delay_matrix = self._delay_matrix()
         self.theta_max = self.delay_matrix.max()
         self.nz = self.theta_max*self.nu
@@ -61,6 +61,17 @@ class OPOM(object):
                 0,
                 self.H)
 
+    def _order(self):
+        na = np.zeros((self.ny,self.nu), dtype='int')
+        for i in range(self.H.shape[0]):
+            for j in range(self.H.shape[1]):
+                b = self.H[i,j].num
+                a = self.H[i,j].den
+                r, p, k = signal.residue(b,a)
+                na[i,j] = (p != 0).sum()
+        return na
+    
+    
     def _max_order(self):
         na = 0
         for h in self.H.flatten():
@@ -68,9 +79,11 @@ class OPOM(object):
             na = max(na, na_h)
         return na
 
+
     def _get_coeff(self, b, a):
         # multiply by 1/s (step)
         a = np.append(a, 0)
+        
         # do partial fraction expansion
         # r: Residues
         # p: Poles
@@ -78,12 +91,12 @@ class OPOM(object):
         r, p, k = signal.residue(b, a)
 
         d_s = np.array([])
-        d_d_real = np.zeros(self.na)
-        d_d_imag = np.zeros(self.na)
+        d_d_real = np.array([])
+        d_d_imag = np.array([])
         d_i = np.array([])
         
-        poles_real = np.zeros(self.na)
-        poles_imag = np.zeros(self.na)
+        poles_real = np.array([])
+        poles_imag = np.array([])
         integrador = 0
         i = 0
         for i in range(np.size(p)):
@@ -94,21 +107,23 @@ class OPOM(object):
                     d_s = np.append(d_s, r[i].real)
                     integrador += 1
             else:
-                d_d_real[i-1] = r[i].real
-                d_d_imag[i-1] = r[i].imag
-                poles_real[i-1] = p[i].real
-                poles_imag[i-1] = p[i].imag
+                d_d_real = np.append(d_d_real, r[i].real)
+                d_d_imag = np.append(d_d_imag, r[i].imag)
+                poles_real = np.append(poles_real, p[i].real)
+                poles_imag = np.append(poles_imag, p[i].imag)
         if (d_i.size == 0):
             d_i = np.append(d_i, 0)
         return d_s, d_d_real, d_d_imag, d_i, poles_real, poles_imag
 
+
     def _coeff_matrices(self):
+        n_order = self._max_order()
         D0 = np.zeros((self.ny, self.nu))
-        Dd_r = np.zeros((self.ny, self.nu, self.na))
-        Dd_i = np.zeros((self.ny, self.nu, self.na))
+        Dd_r = np.zeros((self.ny, self.nu, n_order))
+        Dd_i = np.zeros((self.ny, self.nu, n_order))
         Di = np.zeros((self.ny, self.nu))
-        R_r = np.zeros((self.ny, self.nu, self.na))
-        R_i = np.zeros((self.ny, self.nu, self.na))
+        R_r = np.zeros((self.ny, self.nu, n_order))
+        R_i = np.zeros((self.ny, self.nu, n_order))
         for i in range(self.ny):  # output
             for j in range(self.nu):  # input 
                 if self.H.size > 1:
@@ -120,35 +135,40 @@ class OPOM(object):
                 d0, dd_r, dd_i, di, r_r, r_i = self._get_coeff(b, a)
                 D0[i,j] = d0
                 Di[i,j] = di
-                for k in range(self.na):  # state
+                for k in range(self.na[i,j]):  # state
                     Dd_r[i,j,k] = dd_r[k]
                     Dd_i[i,j,k] = dd_i[k]
                     R_r[i,j,k] = r_r[k]
                     R_i[i,j,k] = r_i[k]
         return R_r, R_i, D0, Di, Dd_r, Dd_i
     
+    
     def _Aux(self):
-        #F1 = np.diag(np.exp(self.Ts * self.R_r.flatten()))
         
         F = np.zeros((self.nd, self.nd))
         Dd_ref = np.zeros((self.nd, self.nd))
         psi = np.zeros((self.ny, self.nd))
+        N = np.array([])
         
         Dd_r = self.Dd_r
         Dd_i = self.Dd_i
-        dim = self.nu * self.na
         
+        na_max = self._max_order()
         l = 0
         for i in range(self.ny):
+            J = np.zeros((self.nu*na_max, self.nu))
+            m = 0
             for j in range(self.nu):
                 k=0
-                while (k < self.na):
+                while (k < self.na[i,j]):
                     if self.R_i[i,j,k] == 0:
                         F[l,l] = np.exp(self.Ts * self.R_r[i,j,k])
                         Dd_ref[l,l] = Dd_r[i,j,k]
                         psi[i,l] = 1
+                        J[m,j] = 1
                         k += 1
                         l += 1
+                        m += 1
                     else:
                         F[l,l] = np.exp(self.Ts * self.R_r[i,j,k]) * \
                                     math.cos(-self.Ts*self.R_i[i,j,k])
@@ -164,15 +184,16 @@ class OPOM(object):
                         Dd_ref[l+1,l+1] = Dd_r[i,j,k] - Dd_i[i,j,k]
                         psi[i,l] = 1
                         psi[i,l+1] = 0
+                        J[m,j] = 1
+                        J[m+1,j] = 1
                         k += 2
                         l += 2
-                                            
-        J = np.zeros((self.nu*self.na, self.nu))
-        for col in range(self.nu):
-            J[col*self.na:col*self.na+self.na, col] = np.ones(self.na)
-        N = J
-        for _ in range(self.ny-1):
-            N = np.vstack((N, J)) 
+                        m += 2
+            J = J[0:m,:]
+            if i == 0:
+                N = J
+            else:
+                N = np.vstack((N,J)) 
         
         Bd_ref = Dd_ref@F@N
         
@@ -188,17 +209,21 @@ class OPOM(object):
                         self.Di,
                         0)
 
+        
     def _Bd(self, l):
         Bd = self.Bd_ref
-        flat_delay_matrix = self.delay_matrix.flatten().tolist()
-        delay_matrix_nd = list(map(lambda x: [x]*self.na,
-                                   flat_delay_matrix))
-        delay_matrix_nd_nu = np.diag(
-                                np.array(delay_matrix_nd).flatten()
-                             ).dot(self.N)
-        return np.where(delay_matrix_nd_nu == l,
+        delay_matrix = self.delay_matrix
+        dim = int(Bd.shape[0]/self.ny)
+        
+        Jl = np.zeros(Bd.shape)
+        for i in range(self.ny):
+            for j in range(self.nu):
+                Jl[i*dim:i*dim+self.na[i,j],j] = delay_matrix[i,j]
+        
+        return np.where(Jl == l,
                         Bd,
                         0)
+        
 
     def _create_Az(self):
         z1_row = np.zeros((self.nu, self.nx))
@@ -296,17 +321,17 @@ class OPOM(object):
 
 
 if __name__ == '__main__':
-    h11 = TransferFunctionDelay([-0.19], [1, 0], delay=2)
-    h12 = TransferFunctionDelay([-1.7], [19.5, 1])
-    h21 = TransferFunctionDelay([-0.763], [31.8, 1])
-    h22 = TransferFunctionDelay([0.235], [1, 0])
+    h11 = TransferFunction([-0.19], [1, 0], delay=2)
+    h12 = TransferFunction([-1.7], [19.5, 1])
+    h21 = TransferFunction([-0.763], [31.8, 1])
+    h22 = TransferFunction([0.235], [1, 0])
     H = [[h11, h12], [h21, h22]]
     Ts = 1
     model = OPOM(H, Ts)
 
-    g11 = TransferFunctionDelay([2.6], [62, 1], delay=1)
-    g12 = TransferFunctionDelay([1.5], [1426, 85, 1], delay=2)  # g12 = 1.5/(1+23s)(1+62s)
-    g21 = TransferFunctionDelay([1.4], [2700, 120, 1], delay=3)  # g21 = 1.4/(1+30s)(1+90s)
-    g22 = TransferFunctionDelay([2.8], [90, 1], delay=4)
+    g11 = TransferFunction([2.6], [62, 1], delay=1)
+    g12 = TransferFunction([1.5], [1426, 85, 1], delay=2)  # g12 = 1.5/(1+23s)(1+62s)
+    g21 = TransferFunction([1.4], [2700, 120, 1], delay=3)  # g21 = 1.4/(1+30s)(1+90s)
+    g22 = TransferFunction([2.8], [90, 1], delay=4)
     G = [[g11, g12], [g21, g22]]
     sys = OPOM(G, Ts)
