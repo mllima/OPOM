@@ -213,12 +213,14 @@ class OPOM(object):
     def _Bd(self, l):
         Bd = self.Bd_ref
         delay_matrix = self.delay_matrix
-        dim = int(Bd.shape[0]/self.ny)
         
         Jl = np.zeros(Bd.shape)
+        ini = 0
         for i in range(self.ny):
             for j in range(self.nu):
-                Jl[i*dim:i*dim+self.na[i,j],j] = delay_matrix[i,j]
+                end = ini + self.na[i,j]
+                Jl[ini:end,j] = delay_matrix[i,j] 
+                ini = end
         
         return np.where(Jl == l,
                         Bd,
