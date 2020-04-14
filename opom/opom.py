@@ -49,27 +49,42 @@ class OPOM(object):
 
     def _delay_matrix(self):
         # the delay is converted in number of Ts
-        return np.apply_along_axis(
-                lambda row: list(map(lambda tf: round(tf.delay/self.Ts), row)),
-                0,
-                self.H)
+        H = self.H 
+        delays = np.zeros((self.ny,self.nu), dtype='int')
+        for i in range(self.ny):
+            for j in range(self.nu):
+                try:  
+                    delays[i,j] = round(H[i,j].delay/self.Ts)
+                except:
+                    delays[i,j] = 0
+        return delays
+        # return np.apply_along_axis(
+        #         lambda row: list(map(lambda tf: round(tf.delay/self.Ts), row)),
+        #         0,
+        #         self.H)
 
     def _order(self):
         H = self.H 
         na = np.zeros((self.ny,self.nu), dtype='int')
         for i in range(self.ny):
             for j in range(self.nu):
-                b = H[i,j].num
-                a = H[i,j].den
-                _, p, _ = signal.residue(b,a)
-                na[i,j] = (p != 0).sum()
+                try:
+                    b = H[i,j].num
+                    a = H[i,j].den
+                    _, p, _ = signal.residue(b,a)
+                    na[i,j] = (p != 0).sum()
+                except:
+                    na[i,j] = 0
         return na
     
     
     def _max_order(self):
         na = 0
         for h in self.H.flatten():
-            na_h = len(h.den) - 1
+            try: 
+                na_h = len(h.den) - 1
+            except:
+                na_h = 0
             na = max(na, na_h)
         return na
 
@@ -120,11 +135,15 @@ class OPOM(object):
         R_i = np.zeros((self.ny, self.nu, n_order))
         for i in range(self.ny):  # output
             for j in range(self.nu):  # input 
-                b = self.H[i][j].num
-                a = self.H[i][j].den
-                d0, dd_r, dd_i, di, r_r, r_i = self._get_coeff(b, a)
-                D0[i,j] = d0
-                Di[i,j] = di
+                try:
+                    b = self.H[i][j].num
+                    a = self.H[i][j].den
+                    d0, dd_r, dd_i, di, r_r, r_i = self._get_coeff(b, a)
+                    D0[i,j] = d0
+                    Di[i,j] = di
+                except:
+                    D0[i,j] = 0
+                    Di[i,j] = 0
                 for k in range(self.na[i,j]):  # state
                     Dd_r[i,j,k] = dd_r[k]
                     Dd_i[i,j,k] = dd_i[k]

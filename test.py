@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 #%% system TF
 num11 = [0.2**2]
 den11 =[1, 2*0.1*0.2, 0.2**2]   
-h11 = TransferFunction(num11, den11, delay=10)  # delay in seconds
+h11 = TransferFunction(num11, den11, delay=10)
 
 num12 = [1.5]
 den12 = [23*62, 23+62, 1]
@@ -23,6 +23,7 @@ den22 = [90, 1]
 h22 = TransferFunction(num22, den22)
 
 h = [[h11, h12], [h21, h22]]
+#h = [[h11, h12, [[], h22]]
 
 #%% OPOM
 Ts = 0.1
