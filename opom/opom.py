@@ -1,11 +1,6 @@
 
 # -*- coding: utf-8 -*-
-"""
-Created on Wed Apr 26 12:07:03 2017
-@author: Igor Yamamoto and Marcelo Lima
-Changed 07/04/2018 - Marcelo Lima
-Changed 28/10/2019 - Marcelo Lima (deal with complex numbers)
-"""
+
 import numpy as np
 from scipy import signal
 from scipy.linalg import block_diag
@@ -23,15 +18,13 @@ class TransferFunction(signal.TransferFunction):
 
 class OPOM(object):
     def __init__(self, H, Ts):
-        if type(H) != list or np.shape(H[0]) == ():
-            H = [H]  
+        if type(H) != list:
+            H = [[H]]  
+        elif np.shape(H[0]) == ():
+            H = [H]
         self.H = np.array(H)
-        if self.H.size == 1:
-            self.ny = 1
-            self.nu = 1
-        else:
-            self.ny = self.H.shape[0]
-            self.nu = self.H.shape[1]
+        self.ny = np.shape(self.H)[0]
+        self.nu = np.shape(self.H)[1]
         self.Ts = Ts
         self.na = self._order()  # order of Gij
         self.nd = self.na.sum()
@@ -62,12 +55,13 @@ class OPOM(object):
                 self.H)
 
     def _order(self):
+        H = self.H 
         na = np.zeros((self.ny,self.nu), dtype='int')
-        for i in range(self.H.shape[0]):
-            for j in range(self.H.shape[1]):
-                b = self.H[i,j].num
-                a = self.H[i,j].den
-                r, p, k = signal.residue(b,a)
+        for i in range(self.ny):
+            for j in range(self.nu):
+                b = H[i,j].num
+                a = H[i,j].den
+                _, p, _ = signal.residue(b,a)
                 na[i,j] = (p != 0).sum()
         return na
     
@@ -88,7 +82,7 @@ class OPOM(object):
         # r: Residues
         # p: Poles
         # k: Coefficients of the direct polynomial term
-        r, p, k = signal.residue(b, a)
+        r, p, _ = signal.residue(b, a)
 
         d_s = np.array([])
         d_d_real = np.array([])
@@ -126,12 +120,8 @@ class OPOM(object):
         R_i = np.zeros((self.ny, self.nu, n_order))
         for i in range(self.ny):  # output
             for j in range(self.nu):  # input 
-                if self.H.size > 1:
-                    b = self.H[i][j].num
-                    a = self.H[i][j].den
-                else:
-                    b = self.H[i].num
-                    a = self.H[i].den
+                b = self.H[i][j].num
+                a = self.H[i][j].den
                 d0, dd_r, dd_i, di, r_r, r_i = self._get_coeff(b, a)
                 D0[i,j] = d0
                 Di[i,j] = di
